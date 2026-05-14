@@ -1,6 +1,6 @@
 import { Building2, Camera, Users, UserPlus } from 'lucide-react'
 import { useState } from 'react'
-import { useGameStore } from '../store/gameStore'
+import { useGameStore } from '../../common/store/gameStore'
 import '../css/mobile.css'
 
 const money = (value) =>
@@ -10,7 +10,7 @@ const money = (value) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-function MobileGameView({ onNotify }) {
+function MobileGameView({ onNotify, activeTheme, onThemeChange, themeOptions = [] }) {
   const state = useGameStore()
   const [staffModalOpen, setStaffModalOpen] = useState(false)
   const [studioModalOpen, setStudioModalOpen] = useState(false)
@@ -56,6 +56,22 @@ function MobileGameView({ onNotify }) {
         <p>Day {state.day} · Budget {money(state.money)}</p>
         <p>Popularity {state.popularity} · Reputation {state.companyReputation}</p>
       </div>
+
+      <section className="mobile-card">
+        <h2>Theme</h2>
+        <label className="mobile-muted" htmlFor="mobile-theme-switch">UI Theme</label>
+        <select
+          id="mobile-theme-switch"
+          className="mobile-endday"
+          style={{ marginTop: 8 }}
+          value={activeTheme}
+          onChange={(event) => onThemeChange?.(event.target.value)}
+        >
+          {themeOptions.map((theme) => (
+            <option key={theme.key} value={theme.key}>{theme.label}</option>
+          ))}
+        </select>
+      </section>
 
       {state.gameOver && (
         <section className="mobile-card" style={{ borderColor: '#ef4444' }}>

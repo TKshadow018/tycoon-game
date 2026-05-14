@@ -1,25 +1,19 @@
 import { useMemo, useState } from 'react'
-import { useGameStore } from '../store/gameStore'
+import { useGameStore } from '../../common/store/gameStore'
 import EquipmentModal from './desktop/EquipmentModal'
-import EquipmentSection from './desktop/EquipmentSection'
 import FreelanceSection from './desktop/FreelanceSection'
-import HeroHeader from './desktop/HeroHeader'
 import InventorySection from './desktop/InventorySection'
 import InterviewModal from './desktop/InterviewModal'
 import ModelModal from './desktop/ModelModal'
-import ModelsSection from './desktop/ModelsSection'
 import PartyModal from './desktop/PartyModal'
 import ProductionModal from './desktop/ProductionModal'
-import ProductionSection from './desktop/ProductionSection'
 import StaffModal from './desktop/StaffModal'
-import StaffSection from './desktop/StaffSection'
 import StatisticsModal from './desktop/StatisticsModal'
 import StudioModal from './desktop/StudioModal'
-import StudioSection from './desktop/StudioSection'
 import {
   BANNER_STYLE_PRESETS,
   generateLocalProductionBanner,
-} from '../utils/localBannerGenerator'
+} from '../../common/utils/localBannerGenerator'
 import '../css/desktop.css'
 
 const money = (value) =>
@@ -35,11 +29,6 @@ const DEFAULT_BANNER_PRESET_KEY = BANNER_STYLE_PRESETS[0]?.key || 'studio-classi
 function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange, themeOptions = [] }) {
   const state = useGameStore()
 
-  const [staffModalOpen, setStaffModalOpen] = useState(false)
-  const [studioModalOpen, setStudioModalOpen] = useState(false)
-  const [modelModalOpen, setModelModalOpen] = useState(false)
-  const [productionModalOpen, setProductionModalOpen] = useState(false)
-  const [equipmentModalOpen, setEquipmentModalOpen] = useState(false)
   const [createWebsiteModalOpen, setCreateWebsiteModalOpen] = useState(false)
   const [manageWebsiteModalOpen, setManageWebsiteModalOpen] = useState(false)
   const [partyModalOpen, setPartyModalOpen] = useState(false)
@@ -50,7 +39,7 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
   const [paymentBonusById, setPaymentBonusById] = useState({})
   const [interviewModalOpen, setInterviewModalOpen] = useState(false)
   const [interviewSession, setInterviewSession] = useState(null)
-  const [activeLeftTab, setActiveLeftTab] = useState('staff')
+  const [activeLeftTab, setActiveLeftTab] = useState('overview')
 
   const [selectedModelIds, setSelectedModelIds] = useState([])
   const [staffByCategory, setStaffByCategory] = useState({})
@@ -242,7 +231,7 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
     })
   }
 
-  const openProductionModal = () => {
+  const prepareProductionDraft = () => {
     const staffDefault = Object.fromEntries(
       state.staffCategories.map((category) => {
         const hired = state.hiredStaff.find(
@@ -275,7 +264,6 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
         return item?.category === 'camera'
       }),
     )
-    setProductionModalOpen(true)
   }
 
   const toggleModelSelection = (modelId) => {
@@ -301,9 +289,9 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
     gigId: selectedGigId || undefined,
   }
 
-  const productionPreview = productionModalOpen
+  const productionPreview = activeLeftTab === 'production'
     ? state.previewProduction(payload)
-    : { ok: false, error: 'Open production modal.' }
+    : { ok: false, error: 'Open production command.' }
 
   const canStartShoot = productionPreview.ok
   const shootBlockReason = canStartShoot
@@ -378,7 +366,7 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
       data: producedItem,
     })
 
-    setProductionModalOpen(false)
+    setActiveLeftTab('overview')
   }
 
   const handleFreelanceBid = (gig, bidAmount) => {
@@ -532,259 +520,314 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
     })
   }
 
-  const leftTabItems = [
-    { key: 'staff', label: `Staff (${state.hiredStaff.length})` },
-    { key: 'models', label: `Models (${state.roster.length})` },
-    { key: 'studio', label: `Studio (${state.activeStudio ? '1' : '0'})` },
-    { key: 'equipment', label: `Equipment (${ownedEquipment.length})` },
+  const sidebarItems = [
+    { key: 'overview', label: 'Agency Overview' },
+    { key: 'production', label: 'Production Command' },
+    { key: 'contracts', label: 'Freelance Contracts' },
+    { key: 'staff', label: 'Staff Operations' },
+    { key: 'models', label: 'Model Operations' },
+    { key: 'studio', label: 'Studio Control' },
+    { key: 'equipment', label: 'Equipment Deck' },
+    { key: 'inventory', label: 'Inventory & Sales' },
   ]
+
+  const activeSidebarItem = sidebarItems.find((item) => item.key === activeLeftTab) || sidebarItems[0]
+
+  const renderInventoryPanel = () => (
+    <InventorySection
+      inventoryItems={state.inventoryItems}
+      money={money}
+      websites={state.websites}
+      onSellItem={(itemId, channel, options) => {
+        const result = state.sellInventoryItem(itemId, channel, options)
+        if (!result.ok) {
+          onNotify({ type: 'error', message: result.error })
+          return
+        }
+
+        const tipText = result.result.tip > 0 ? ` · Tip ${money(result.result.tip)}` : ''
+        const viewsText = result.result.views ? ` · Views ${result.result.views}` : ''
+        const postedText = channel === 'website' ? ' · Posted to website banner feed' : ''
+        onNotify({
+          type: 'success',
+          message: `${result.result.title} ${channel === 'website' ? 'uploaded' : 'sold'} via ${result.result.channel} for ${money(result.result.total)}${tipText}${viewsText}${postedText}`,
+          data: result.result,
+        })
+      }}
+    />
+  )
+
+  const renderDashboardPanel = () => {
+    if (activeLeftTab === 'overview') {
+      return (
+        <article className="pc-card pc-c-overview-card">
+          <div className="pc-c-overview-grid">
+            <div className="pc-c-overview-metric">
+              <span>Budget</span>
+              <strong>{money(state.money)}</strong>
+            </div>
+            <div className="pc-c-overview-metric">
+              <span>Popularity</span>
+              <strong>{state.popularity}</strong>
+            </div>
+            <div className="pc-c-overview-metric">
+              <span>Reputation</span>
+              <strong>{state.companyReputation}</strong>
+            </div>
+            <div className="pc-c-overview-metric">
+              <span>Action Points</span>
+              <strong>{state.actionPoints}/{state.maxActionPoints}</strong>
+            </div>
+          </div>
+          <div className="pc-c-overview-body">
+            <p className="pc-muted">Agency pulse by department.</p>
+            <div className="pc-c-overview-list">
+              <div>Staff Active: {state.hiredStaff.length}</div>
+              <div>Models Signed: {state.roster.length}</div>
+              <div>Open Contracts: {state.dailyFreelanceGigs.length}</div>
+              <div>Inventory Items: {state.inventoryItems.length}</div>
+              <div>Pending Payments: {duePayments.length}</div>
+            </div>
+          </div>
+        </article>
+      )
+    }
+
+    if (activeLeftTab === 'production') {
+      return (
+        <ProductionModal
+          inline
+          open
+          onClose={() => {}}
+          state={state}
+          money={money}
+          selectedGigId={selectedGigId}
+          setSelectedGigId={setSelectedGigId}
+          selectedModelIds={selectedModelIds}
+          toggleModelSelection={toggleModelSelection}
+          staffByCategory={staffByCategory}
+          setStaffByCategory={setStaffByCategory}
+          shootType={shootType}
+          setShootType={setShootType}
+          nameMode={nameMode}
+          setNameMode={setNameMode}
+          customTitle={customTitle}
+          setCustomTitle={setCustomTitle}
+          previousTitle={previousTitle}
+          setPreviousTitle={setPreviousTitle}
+          previousBaseTitles={previousBaseTitles}
+          description={description}
+          setDescription={setDescription}
+          locationId={locationId}
+          setLocationId={setLocationId}
+          serviceLevel={serviceLevel}
+          setServiceLevel={setServiceLevel}
+          dressPartnerId={dressPartnerId}
+          setDressPartnerId={setDressPartnerId}
+          selectedEquipmentIds={selectedEquipmentIds}
+          setSelectedEquipmentIds={setSelectedEquipmentIds}
+          ownedEquipment={ownedEquipment}
+          productionPreview={productionPreview}
+          canStartShoot={canStartShoot}
+          shootBlockReason={shootBlockReason}
+          onStartShoot={handleStartProduction}
+          isShootInProgress={isShootInProgress}
+          bannerPresetKey={bannerPresetKey}
+          setBannerPresetKey={setBannerPresetKey}
+          selectedBannerModelId={selectedBannerModelId}
+          setSelectedBannerModelId={setSelectedBannerModelId}
+        />
+      )
+    }
+
+    if (activeLeftTab === 'contracts') {
+      return (
+        <FreelanceSection
+          dailyFreelanceGigs={state.dailyFreelanceGigs}
+          activeGigContracts={state.activeGigContracts}
+          workTypes={state.workTypes}
+          popularity={state.popularity}
+          getCompanyRelation={getCompanyRelation}
+          onBid={handleFreelanceBid}
+          money={money}
+        />
+      )
+    }
+
+    if (activeLeftTab === 'staff') {
+      return (
+        <StaffModal
+          inline
+          open
+          onClose={() => {}}
+          staffMarket={state.staffMarket}
+          moneyValue={state.money}
+          money={money}
+          onHireDaily={(staff) => {
+            const result = state.hireStaff(staff.id, 'daily')
+            if (!result.ok) {
+              onNotify({ type: 'error', message: result.error })
+              return
+            }
+
+            const message = result.result.extended
+              ? `${staff.name} contract extended by ${result.result.daysAdded} day(s). Deferred payment +${money(result.result.deferredPaymentAdded)}.`
+              : `${staff.name} hired on daily contract. Payment deferred to contract end.`
+
+            onNotify({ type: 'success', message, data: result.result })
+          }}
+          onHireWeekly={(staff) => {
+            const result = state.hireStaff(staff.id, 'weekly')
+            if (!result.ok) {
+              onNotify({ type: 'error', message: result.error })
+              return
+            }
+
+            const message = result.result.extended
+              ? `${staff.name} contract extended by ${result.result.daysAdded} day(s). Deferred payment +${money(result.result.deferredPaymentAdded)}.`
+              : `${staff.name} hired on weekly contract. Payment deferred to contract end.`
+
+            onNotify({ type: 'success', message, data: result.result })
+          }}
+          onHireMonthly={(staff) => {
+            const result = state.hireStaff(staff.id, 'monthly')
+            if (!result.ok) {
+              onNotify({ type: 'error', message: result.error })
+              return
+            }
+
+            const message = result.result.extended
+              ? `${staff.name} contract extended by ${result.result.daysAdded} day(s). Deferred payment +${money(result.result.deferredPaymentAdded)}.`
+              : `${staff.name} hired on monthly contract. Payment deferred to contract end.`
+
+            onNotify({ type: 'success', message, data: result.result })
+          }}
+        />
+      )
+    }
+
+    if (activeLeftTab === 'models') {
+      return (
+        <ModelModal
+          inline
+          open
+          onClose={() => {}}
+          availableModels={availableModels}
+          companyReputation={state.companyReputation}
+          money={state.money}
+          onHire={(modelId, modelName) => run(state.hireModel(modelId), `${modelName} hired. Payment deferred to contract end.`)}
+        />
+      )
+    }
+
+    if (activeLeftTab === 'studio') {
+      return (
+        <StudioModal
+          inline
+          open
+          onClose={() => {}}
+          studioCatalog={state.studioCatalog}
+          moneyValue={state.money}
+          activeStudio={state.activeStudio}
+          money={money}
+          onRent={(studioId, term, studioName) =>
+            run(state.rentStudio(studioId, term), `${studioName} rented for ${term}.`)
+          }
+          onBuy={(studioId, studioName) => run(state.buyStudio(studioId), `${studioName} purchased.`)}
+        />
+      )
+    }
+
+    if (activeLeftTab === 'equipment') {
+      return (
+        <EquipmentModal
+          inline
+          open
+          onClose={() => {}}
+          equipmentCatalog={state.equipmentCatalog}
+          ownedEquipmentIds={state.ownedEquipmentIds}
+          moneyValue={state.money}
+          money={money}
+          onBuy={(equipmentId, equipmentName) =>
+            run(state.buyEquipment(equipmentId), `${equipmentName} purchased.`)
+          }
+        />
+      )
+    }
+
+    return renderInventoryPanel()
+  }
 
   return (
     <main className="pc-wrap">
       <div className="pc-shell">
-        <HeroHeader
-          companyName={state.companyName}
-          activeStudio={state.activeStudio}
-          staffCount={state.hiredStaff.length}
-          modelCount={state.roster.length}
-          day={state.day}
-          budget={state.money}
-          popularity={state.popularity}
-          reputation={state.companyReputation}
-          actionPoints={state.actionPoints}
-          maxActionPoints={state.maxActionPoints}
-          onEndDay={handleEndDay}
-          onSaveGame={handleSaveGame}
-          onLoadGame={handleLoadGame}
-          selectedSaveSlot={selectedSaveSlot}
-          onSelectSaveSlot={setSelectedSaveSlot}
-          saveSlots={state.saveSlots || []}
-          bannerUrl={state.banners[state.day % state.banners.length]}
-          money={money}
-        />
+        <section className="pc-c-layout">
+          <aside className="pc-c-sidebar">
+            <div className="pc-c-sidebar-brand">
+              <p>Pattern C</p>
+              <h2>Agency Console</h2>
+            </div>
 
-        {state.gameOver && (
-          <section className="pc-card" style={{ borderColor: '#ef4444' }}>
-            <h2>Game Over</h2>
-            <p className="pc-muted">{state.gameOverReason?.message || 'Company operations are permanently closed.'}</p>
-          </section>
-        )}
+            <button className="pc-c-sidebar-nextday" onClick={handleEndDay}>Proceed to Next Day</button>
 
-        <section className="pc-layout">
-          <aside className="pc-left-column">
-            <div className="pc-left-tabs" role="tablist" aria-label="PC resource tabs">
-              {leftTabItems.map((tab) => (
+            <div className="pc-c-sidebar-controls">
+              <button className="pc-c-sidebar-ghost" onClick={handleSaveGame}>Save</button>
+              <button className="pc-c-sidebar-ghost" onClick={handleLoadGame}>Load</button>
+              <select value={selectedSaveSlot} onChange={(event) => setSelectedSaveSlot(Number(event.target.value))}>
+                {state.saveSlots.map((slotInfo) => (
+                  <option key={slotInfo.slot} value={slotInfo.slot}>
+                    {`Slot ${slotInfo.slot}${slotInfo.occupied ? ` - ${slotInfo.companyName || 'Saved'} D${slotInfo.day ?? '-'}${Number.isFinite(slotInfo.money) ? ` (${money(slotInfo.money)})` : ''}` : ' - Empty'}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="pc-c-sidebar-nav" role="tablist" aria-label="Pattern C navigation">
+              {sidebarItems.map((item) => (
                 <button
-                  key={tab.key}
+                  key={item.key}
                   type="button"
                   role="tab"
-                  aria-selected={activeLeftTab === tab.key}
-                  className={`pc-left-tab-btn${activeLeftTab === tab.key ? ' is-active' : ''}`}
-                  onClick={() => setActiveLeftTab(tab.key)}
+                  aria-selected={activeLeftTab === item.key}
+                  className={`pc-c-sidebar-btn${activeLeftTab === item.key ? ' is-active' : ''}`}
+                  onClick={() => {
+                    if (item.key === 'production') {
+                      prepareProductionDraft()
+                    }
+                    setActiveLeftTab(item.key)
+                  }}
                 >
-                  {tab.label}
+                  {item.label}
                 </button>
               ))}
             </div>
+          </aside>
 
-            <div className="pc-left-tab-panel">
-              {activeLeftTab === 'staff' && (
-                <StaffSection
-                  hiredStaff={state.hiredStaff}
-                  onOpenStaffModal={() => setStaffModalOpen(true)}
-                  onRenewStaffContract={(hiredId, term) => {
-                    const result = state.renewStaffContract(hiredId, term)
-                    if (!result.ok) {
-                      onNotify({ type: 'error', message: result.error })
-                      return
-                    }
+          <section className="pc-c-dashboard">
+            {state.gameOver && (
+              <section className="pc-card pc-c-gameover" style={{ borderColor: '#ef4444' }}>
+                <h2>Game Over</h2>
+                <p className="pc-muted">{state.gameOverReason?.message || 'Company operations are permanently closed.'}</p>
+              </section>
+            )}
 
-                    onNotify({
-                      type: 'success',
-                      message: `${result.result.name} contract renewed for ${result.result.term}. Deferred payment ${money(result.result.deferredPayment)} due at contract end.`,
-                      data: result.result,
-                    })
-                  }}
-                  money={money}
-                />
-              )}
-              {activeLeftTab === 'models' && (
-                <ModelsSection
-                  roster={state.roster}
-                  onOpenModelModal={() => setModelModalOpen(true)}
-                  onRenewModelContract={(modelId, term) => {
-                    const result = state.renewModelContract(modelId, term)
-                    if (!result.ok) {
-                      onNotify({ type: 'error', message: result.error })
-                      return
-                    }
+            <header className="pc-c-dashboard-head">
+              <div>
+                <p>Current Module</p>
+                <h3>{activeSidebarItem.label}</h3>
+              </div>
+              <div className="pc-c-dashboard-meta">
+                <span>Day {state.day}</span>
+                <span>Budget {money(state.money)}</span>
+              </div>
+            </header>
 
-                    onNotify({
-                      type: 'success',
-                      message: `${result.result.name} contract renewed for ${result.result.term}. Deferred payment ${money(result.result.deferredPayment)} due at contract end.`,
-                      data: result.result,
-                    })
-                  }}
-                  money={money}
-                />
-              )}
-              {activeLeftTab === 'studio' && (
-                <StudioSection
-                  activeStudio={state.activeStudio}
-                  onOpenStudioModal={() => setStudioModalOpen(true)}
-                />
-              )}
-              {activeLeftTab === 'equipment' && (
-                <EquipmentSection
-                  ownedEquipment={ownedEquipment}
-                  onOpenEquipmentModal={() => setEquipmentModalOpen(true)}
-                  onSellEquipment={(equipmentId, equipmentName) => {
-                    const result = state.sellEquipment(equipmentId)
-                    if (!result.ok) {
-                      onNotify({ type: 'error', message: result.error })
-                      return
-                    }
-
-                    onNotify({
-                      type: 'success',
-                      message: `${equipmentName} sold for ${money(result.result.sellPrice)}.`,
-                      data: result.result,
-                    })
-                  }}
-                  money={money}
-                />
-              )}
+            <div className="pc-c-dashboard-body">
+              {renderDashboardPanel()}
             </div>
-          </aside>
-
-          <div className="pc-center-column">
-            <ProductionSection
-              onOpenProductionModal={openProductionModal}
-              onSelectAction={handleActionSelect}
-              isCreateWebsiteDisabled={state.websites.length >= 5}
-              isManageWebsiteDisabled={state.websites.length === 0}
-              actionCostLabels={actionCostLabels}
-              activeTheme={activeTheme}
-              onThemeChange={onThemeChange}
-              themeOptions={themeOptions}
-            />
-            <InventorySection
-              inventoryItems={state.inventoryItems}
-              money={money}
-              websites={state.websites}
-              onSellItem={(itemId, channel, options) => {
-                const result = state.sellInventoryItem(itemId, channel, options)
-                if (!result.ok) {
-                  onNotify({ type: 'error', message: result.error })
-                  return
-                }
-
-                const tipText = result.result.tip > 0 ? ` · Tip ${money(result.result.tip)}` : ''
-                const viewsText = result.result.views ? ` · Views ${result.result.views}` : ''
-                const postedText = channel === 'website' ? ' · Posted to website banner feed' : ''
-                onNotify({
-                  type: 'success',
-                  message: `${result.result.title} ${channel === 'website' ? 'uploaded' : 'sold'} via ${result.result.channel} for ${money(result.result.total)}${tipText}${viewsText}${postedText}`,
-                  data: result.result,
-                })
-              }}
-            />
-          </div>
-
-          <aside className="pc-right-column">
-            <FreelanceSection
-              dailyFreelanceGigs={state.dailyFreelanceGigs}
-              activeGigContracts={state.activeGigContracts}
-              workTypes={state.workTypes}
-              popularity={state.popularity}
-              getCompanyRelation={getCompanyRelation}
-              onBid={handleFreelanceBid}
-              money={money}
-            />
-          </aside>
+          </section>
         </section>
       </div>
-
-      <StaffModal
-        open={staffModalOpen}
-        onClose={() => setStaffModalOpen(false)}
-        staffMarket={state.staffMarket}
-        moneyValue={state.money}
-        money={money}
-        onHireDaily={(staff) => {
-          const result = state.hireStaff(staff.id, 'daily')
-          if (!result.ok) {
-            onNotify({ type: 'error', message: result.error })
-            return
-          }
-
-          const message = result.result.extended
-            ? `${staff.name} contract extended by ${result.result.daysAdded} day(s). Deferred payment +${money(result.result.deferredPaymentAdded)}.`
-            : `${staff.name} hired on daily contract. Payment deferred to contract end.`
-
-          onNotify({ type: 'success', message, data: result.result })
-        }}
-        onHireWeekly={(staff) => {
-          const result = state.hireStaff(staff.id, 'weekly')
-          if (!result.ok) {
-            onNotify({ type: 'error', message: result.error })
-            return
-          }
-
-          const message = result.result.extended
-            ? `${staff.name} contract extended by ${result.result.daysAdded} day(s). Deferred payment +${money(result.result.deferredPaymentAdded)}.`
-            : `${staff.name} hired on weekly contract. Payment deferred to contract end.`
-
-          onNotify({ type: 'success', message, data: result.result })
-        }}
-        onHireMonthly={(staff) => {
-          const result = state.hireStaff(staff.id, 'monthly')
-          if (!result.ok) {
-            onNotify({ type: 'error', message: result.error })
-            return
-          }
-
-          const message = result.result.extended
-            ? `${staff.name} contract extended by ${result.result.daysAdded} day(s). Deferred payment +${money(result.result.deferredPaymentAdded)}.`
-            : `${staff.name} hired on monthly contract. Payment deferred to contract end.`
-
-          onNotify({ type: 'success', message, data: result.result })
-        }}
-      />
-
-      <StudioModal
-        open={studioModalOpen}
-        onClose={() => setStudioModalOpen(false)}
-        studioCatalog={state.studioCatalog}
-        moneyValue={state.money}
-        activeStudio={state.activeStudio}
-        money={money}
-        onRent={(studioId, term, studioName) =>
-          run(state.rentStudio(studioId, term), `${studioName} rented for ${term}.`)
-        }
-        onBuy={(studioId, studioName) => run(state.buyStudio(studioId), `${studioName} purchased.`)}
-      />
-
-      <ModelModal
-        open={modelModalOpen}
-        onClose={() => setModelModalOpen(false)}
-        availableModels={availableModels}
-        companyReputation={state.companyReputation}
-        money={state.money}
-        onHire={(modelId, modelName) => run(state.hireModel(modelId), `${modelName} hired. Payment deferred to contract end.`)}
-      />
-
-      <EquipmentModal
-        open={equipmentModalOpen}
-        onClose={() => setEquipmentModalOpen(false)}
-        equipmentCatalog={state.equipmentCatalog}
-        ownedEquipmentIds={state.ownedEquipmentIds}
-        moneyValue={state.money}
-        money={money}
-        onBuy={(equipmentId, equipmentName) =>
-          run(state.buyEquipment(equipmentId), `${equipmentName} purchased.`)
-        }
-      />
 
       <InterviewModal
         open={interviewModalOpen}
@@ -1275,48 +1318,6 @@ function DesktopGameView({ onNotify, activeTheme = 'neumorphism', onThemeChange,
           </div>
         </div>
       )}
-
-      <ProductionModal
-        open={productionModalOpen}
-        onClose={() => setProductionModalOpen(false)}
-        state={state}
-        money={money}
-        selectedGigId={selectedGigId}
-        setSelectedGigId={setSelectedGigId}
-        selectedModelIds={selectedModelIds}
-        toggleModelSelection={toggleModelSelection}
-        staffByCategory={staffByCategory}
-        setStaffByCategory={setStaffByCategory}
-        shootType={shootType}
-        setShootType={setShootType}
-        nameMode={nameMode}
-        setNameMode={setNameMode}
-        customTitle={customTitle}
-        setCustomTitle={setCustomTitle}
-        previousTitle={previousTitle}
-        setPreviousTitle={setPreviousTitle}
-        previousBaseTitles={previousBaseTitles}
-        description={description}
-        setDescription={setDescription}
-        locationId={locationId}
-        setLocationId={setLocationId}
-        serviceLevel={serviceLevel}
-        setServiceLevel={setServiceLevel}
-        dressPartnerId={dressPartnerId}
-        setDressPartnerId={setDressPartnerId}
-        selectedEquipmentIds={selectedEquipmentIds}
-        setSelectedEquipmentIds={setSelectedEquipmentIds}
-        ownedEquipment={ownedEquipment}
-        productionPreview={productionPreview}
-        canStartShoot={canStartShoot}
-        shootBlockReason={shootBlockReason}
-        onStartShoot={handleStartProduction}
-        isShootInProgress={isShootInProgress}
-        bannerPresetKey={bannerPresetKey}
-        setBannerPresetKey={setBannerPresetKey}
-        selectedBannerModelId={selectedBannerModelId}
-        setSelectedBannerModelId={setSelectedBannerModelId}
-      />
 
       {isShootInProgress && (
         <div className="pc-modal-overlay pc-shoot-loading-overlay" onClick={(event) => event.stopPropagation()}>

@@ -3,13 +3,12 @@ import ModalCloseButton from './ModalCloseButton'
 import {
   BANNER_STYLE_PRESETS,
   generateLocalProductionBanner,
-} from '../../utils/localBannerGenerator'
-import shootType1Base64 from '../../assets/shooting-type-1.base64.txt?raw'
-import shootType2Base64 from '../../assets/shooting-type-2.base64.txt?raw'
-import shootType3Base64 from '../../assets/shooting-type-3.base64.txt?raw'
-import shootType4Base64 from '../../assets/shooting-type-4.base64.txt?raw'
-import shootType5Base64 from '../../assets/shooting-type-5.base64.txt?raw'
-
+} from '../../../common/utils/localBannerGenerator'
+import shootType1Base64 from '../../../common/assets/shooting-type-1.base64.txt?raw'
+import shootType2Base64 from '../../../common/assets/shooting-type-2.base64.txt?raw'
+import shootType3Base64 from '../../../common/assets/shooting-type-3.base64.txt?raw'
+import shootType4Base64 from '../../../common/assets/shooting-type-4.base64.txt?raw'
+import shootType5Base64 from '../../../common/assets/shooting-type-5.base64.txt?raw'
 const serviceImageByLevel = {
   low: '/service/2.jpg',
   medium: '/service/3.jpg',

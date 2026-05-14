@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { createStaffMarket } from '../data/staff'
-import { STAFF_CREATOR_CATEGORIES, recalculateStaffBySkill } from '../data/staffCreatorUtils'
+import { createStaffMarket } from '../../common/data/staff'
+import { STAFF_CREATOR_CATEGORIES, recalculateStaffBySkill } from '../../common/data/staffCreatorUtils'
 
 const ROLE_GROUPS = STAFF_CREATOR_CATEGORIES.map((category) => ({
   key: category.key,
